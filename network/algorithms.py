@@ -1,5 +1,7 @@
 """Modulo com os algoritmos de roteamento usados pelo simulador."""
 
+import heapq
+
 from network.graph import NetworkGraph
 
 
@@ -18,50 +20,72 @@ class NoPathFoundError(Exception):
         )
 
 
-def dijkstra(graph_obj: NetworkGraph, start_node: str, end_node: str) -> tuple[list[str], float]:
+def dijkstra(
+    graph_obj: NetworkGraph,
+    start_node: str,
+    end_node: str,
+) -> tuple[list[str], float]:
     """
-    Algoritmo de Dijkstra para encontrar o caminho de menor latencia entre dois roteadores.
-    Retorna (caminho, latencia_total).
+    Encontra o caminho de menor latencia entre dois roteadores usando Dijkstra
+    com uma fila de prioridades.
 
-    Levanta NoPathFoundError caso o destino esteja isolado na topologia atual.
+    Retorna uma tupla contendo o caminho e a latencia total.
+
+    Levanta NoPathFoundError caso o destino esteja isolado ou algum dos
+    roteadores informados nao exista na topologia atual.
     """
-    if start_node not in graph_obj.get_all_routers() or end_node not in graph_obj.get_all_routers():
+    routers = graph_obj.get_all_routers()
+
+    if start_node not in routers or end_node not in routers:
         raise NoPathFoundError(start_node, end_node)
 
-    # 1. Inicializacao das estruturas do Dijkstra
-    distances: dict[str, float] = {node: float("inf") for node in graph_obj.get_all_routers()}
-    previous_nodes: dict[str, str | None] = {node: None for node in graph_obj.get_all_routers()}
+    # Distancia conhecida e roteador anterior no melhor caminho encontrado.
+    distances: dict[str, float] = {
+        node: float("inf") for node in routers
+    }
+    previous_nodes: dict[str, str | None] = {
+        node: None for node in routers
+    }
+
     distances[start_node] = 0
 
-    unvisited: set[str] = set(graph_obj.get_all_routers())
+    # Cada item da fila possui: (distancia acumulada, roteador).
+    priority_queue: list[tuple[float, str]] = [(0, start_node)]
 
-    # 2. Busca do caminho de menor custo, no a no
-    while unvisited:
-        current_node = min(unvisited, key=lambda node: distances[node])
+    while priority_queue:
+        current_distance, current_node = heapq.heappop(priority_queue)
 
-        if distances[current_node] == float("inf"):
-            break
+        # Ignora entradas antigas que permaneceram na fila após uma rota
+        # melhor para o mesmo roteador ter sido encontrada.
+        if current_distance > distances[current_node]:
+            continue
 
         if current_node == end_node:
             break
 
-        unvisited.remove(current_node)
-
-        # atualiza a distancia dos vizinhos do no atual, se encontrar um caminho mais curto
         for neighbor, weight in graph_obj.get_neighbors(current_node).items():
-            new_distance = distances[current_node] + weight
+            new_distance = current_distance + weight
+
             if new_distance < distances[neighbor]:
                 distances[neighbor] = new_distance
                 previous_nodes[neighbor] = current_node
 
-    # 3. Reconstrucao do caminho a partir dos nos anteriores
+                heapq.heappush(
+                    priority_queue,
+                    (new_distance, neighbor),
+                )
+
     if distances[end_node] == float("inf"):
         raise NoPathFoundError(start_node, end_node)
 
+    # Reconstrucao eficiente do caminho, do destino ate a origem.
     path: list[str] = []
     current: str | None = end_node
+
     while current is not None:
-        path.insert(0, current)
+        path.append(current)
         current = previous_nodes[current]
 
-    return path, distances[end_node]
+    path.reverse()
+
+    return path, distances[end_node]d_node]
