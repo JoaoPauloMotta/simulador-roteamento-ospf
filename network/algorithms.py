@@ -88,4 +88,4 @@ def dijkstra(
 
     path.reverse()
 
-    return path, distances[end_node]d_node]
+    return path, distances[end_node]
