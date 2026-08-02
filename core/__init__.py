@@ -1,1 +1,1 @@
-"""Componentes de rede do simulador OSPF."""
+"""Serviços de simulação do projeto OSPF."""
